@@ -12,15 +12,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Copy Promtail config to VPS
-        uses: appleboy/scp-action@master
+      - name: Git pull repo Grafana_loki_promtail and copy promtail.yaml
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_IP }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
-          source: infra/promtail.yaml
-          target: /home/${{ secrets.VPS_USER }}/promtail.yaml
-          rm: true
+          script: |
+            # Cloner ou mettre à jour le dépôt
+            if [ -d /home/${{ secrets.VPS_USER }}/Grafana_loki_promtail ]; then
+              cd /home/${{ secrets.VPS_USER }}/Grafana_loki_promtail && git pull
+            else
+              git clone https://github.com/biga971/Grafana_loki_promtail.git /home/${{ secrets.VPS_USER }}/Grafana_loki_promtail
+            fi
+            # Copier le promtail.yaml du repo cloné
+            cp /home/${{ secrets.VPS_USER }}/Grafana_loki_promtail/infra/promtail.yaml /home/${{ secrets.VPS_USER }}/promtail.yaml
 
       - name: Deploy Grafana, Loki, Promtail on VPS
         uses: appleboy/ssh-action@master

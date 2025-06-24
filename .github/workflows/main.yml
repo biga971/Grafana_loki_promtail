@@ -1,0 +1,54 @@
+name: Deploy Grafana Stack
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy_grafana_stack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Copy Promtail config to VPS
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.VPS_IP }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: infra/promtail.yaml
+          target: /home/${{ secrets.VPS_USER }}/promtail.yaml
+
+      - name: Deploy Grafana, Loki, Promtail on VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_IP }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            # Créer un docker-compose.yml sur le VPS
+            cat > /home/${{ secrets.VPS_USER }}/docker-compose-grafana.yml <<EOF
+            version: '3'
+            services:
+              loki:
+                image: grafana/loki:2.9.3
+                ports:
+                  - "3100:3100"
+                command: -config.file=/etc/loki/local-config.yaml
+              grafana:
+                image: grafana/grafana:10.0.0
+                ports:
+                  - "3000:3000"
+                environment:
+                  - GF_SECURITY_ADMIN_PASSWORD=${{ secrets.GRAFANA_PASSWORD }}
+              promtail:
+                image: grafana/promtail:2.9.3
+                volumes:
+                  - /var/lib/docker/containers:/var/lib/docker/containers:ro
+                  - /home/${{ secrets.VPS_USER }}/promtail.yaml:/etc/promtail/promtail.yaml
+                command: -config.file=/etc/promtail/promtail.yaml
+            EOF
+            # Lancer la stack
+            docker compose -f /home/${{ secrets.VPS_USER }}/docker-compose-grafana.yml up -d

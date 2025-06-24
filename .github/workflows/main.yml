@@ -55,6 +55,7 @@ jobs:
                 volumes:
                   - /var/lib/docker/containers:/var/lib/docker/containers:ro
                   - /home/${{ secrets.VPS_USER }}/promtail.yaml:/etc/promtail/promtail.yaml
+                  - /var/run/docker.sock:/var/run/docker.sock:ro
                 command: -config.file=/etc/promtail/promtail.yaml
             EOF
             # Lancer la stack

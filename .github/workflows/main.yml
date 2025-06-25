@@ -58,6 +58,27 @@ jobs:
                   - /home/${{ secrets.VPS_USER }}/promtail.yaml:/etc/promtail/promtail.yaml
                   - /var/run/docker.sock:/var/run/docker.sock:ro
                 command: -config.file=/etc/promtail/promtail.yaml
+              alpine-test:
+                image: alpine:latest
+                command: sh -c 'for i in $(seq 1 10); do echo "test loki plugin $i"; sleep 1; done'
+                logging:
+                  driver: loki
+                  options:
+                    loki-url: "http://loki:3100/loki/api/v1/push"
+                    loki-external-labels: "job=docker,container_name={{.Name}},image={{.ImageName}}"
+
             EOF
+            # Installer le Loki Docker Logging Plugin
+            docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions || true
             # Lancer la stack
             docker compose -f /home/${{ secrets.VPS_USER }}/docker-compose-grafana.yml up -d
+
+            # Installer le Loki Docker Logging Plugin (idempotent)
+            docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions || true
+
+            # Lancer un conteneur de test pour vérifier l'envoi direct à Loki
+            docker run --rm \
+              --log-driver=loki \
+              --log-opt loki-url="http://loki:3100/loki/api/v1/push" \
+              --log-opt loki-external-labels="job=docker,container_name={{.Name}},image={{.ImageName}}" \
+              alpine echo "hello loki"
